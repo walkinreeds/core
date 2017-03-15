@@ -119,6 +119,15 @@ class Version20170315173825 implements ISchemaMigration {
 			$table->addIndex(['item_type', 'share_type'], 'item_share_type_index');
 			$table->addIndex(['file_source'], 'file_source_index');
 			$table->addIndex(['token'], 'token_index');
+		} else {
+			$table = $schema->getTable("${prefix}share");
 		}
+
+		// Arbitrary name for the share
+		$table->addColumn('name', 'string', [
+			'default' => '',
+			'notnull' => false,
+			'length' => 64,
+		]);
 	}
 }
