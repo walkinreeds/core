@@ -182,6 +182,7 @@ class FilesReportPlugin extends ServerPlugin {
 		if (empty($filterRules['systemtag']) && is_null($filterRules['favorite'])) {
 			// load all
 			$results = $reportTargetNode->getChildren();
+			$results = $this->slice($results, $report);
 		} else {
 			// gather all file ids matching filter
 			try {
@@ -190,14 +191,12 @@ class FilesReportPlugin extends ServerPlugin {
 				throw new PreconditionFailed('Cannot filter by non-existing tag', 0, $e);
 			}
 
+			// pre-slice the results if needed for pagination to not waste
+			// time resolving nodes that will not be returned anyway
+			$resultFileIds = $this->slice($resultFileIds, $report);
+
 			// find sabre nodes by file id, restricted to the root node path
 			$results = $this->findNodesByFileIds($reportTargetNode, $resultFileIds);
-		}
-
-		if (!is_null($report->limit)) {
-			$length = $report->limit['size'];
-			$offset = $report->limit['page'] * $length;
-			$results = array_slice($results, $offset, $length);
 		}
 
 		$filesUri = $this->getFilesBaseUri($uri, $reportTargetNode->getPath());
@@ -210,6 +209,15 @@ class FilesReportPlugin extends ServerPlugin {
 		$this->server->httpResponse->setBody($xml);
 
 		return false;
+	}
+
+	private function slice($results, $report) {
+		if (!is_null($report->search)) {
+			$length = $report->search['limit'];
+			$offset = $report->search['offset'];
+			$results = array_slice($results, $offset, $length);
+		}
+		return $results;
 	}
 
 	/**
