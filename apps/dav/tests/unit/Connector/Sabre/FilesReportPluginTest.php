@@ -267,65 +267,6 @@ class FilesReportPluginTest extends \Test\TestCase {
 		$this->assertCount(0, $props2[200]['{DAV:}resourcetype']->getValue());
 	}
 
-	public function testOnReportPaginationAll() {
-		$path = 'test';
-
-		$parameters = new FilterRequest();
-		$parameters->properties = [
-			'{DAV:}getcontentlength',
-		];
-		$parameters->search = [
-			'offset' => 2,
-			'limit' => 3,
-		];
-
-		$nodes = [];
-		for ($i = 0; $i < 20; $i++) {
-			$fileInfo = $this->createMock(FileInfo::class);
-			$fileInfo->method('isReadable')->willReturn(true);
-			$node = $this->createMock(\OCA\DAV\Connector\Sabre\File::class);
-			$node->method('getId')->willReturn(1000 + $i);
-			$node->method('getPath')->willReturn('/nodes/node' . $i);
-			$node->method('getFileInfo')->willReturn($fileInfo);
-			$nodes[$node->getId()] = $node;
-		}
-
-		$reportTargetNode = $this->createMock(\OCA\DAV\Connector\Sabre\Directory::class);
-		$reportTargetNode->expects($this->once())
-			->method('getChildren')
-			->willReturn(array_values($nodes));
-
-		$this->tree->expects($this->any())
-			->method('getNodeForPath')
-			->with('/' . $path)
-			->will($this->returnValue($reportTargetNode));
-
-		// getById must only be called for the required nodes
-		$this->userFolder->expects($this->never())
-			->method('getById');
-
-		$this->server->expects($this->any())
-			->method('getRequestUri')
-			->will($this->returnValue($path));
-
-		$this->plugin->initialize($this->server);
-
-		$responses = null;
-		$this->server->expects($this->once())
-			->method('generateMultiStatus')
-			->will($this->returnCallback(function($responsesArg) use (&$responses) {
-				$responses = $responsesArg;
-			})
-		);
-
-		$this->assertFalse($this->plugin->onReport(FilesReportPluginImplementation::REPORT_NAME, $parameters, '/' . $path));
-
-		$this->assertCount(3, $responses);
-
-		$this->assertEquals('/test/nodes/node2', $responses[0]['href']);
-		$this->assertEquals('/test/nodes/node3', $responses[1]['href']);
-		$this->assertEquals('/test/nodes/node4', $responses[2]['href']);
-	}
 	public function testOnReportPaginationFiltered() {
 		$path = 'test';
 

@@ -180,10 +180,34 @@ class FilesReportPlugin extends ServerPlugin {
 		$filterRules = $report->filters;
 
 		if (empty($filterRules['systemtag']) && is_null($filterRules['favorite'])) {
-			// load all
-			$results = $reportTargetNode->getChildren();
-			$results = $this->slice($results, $report);
+			// FIXME: search currently not possible because results are missing properties!
+			throw new BadRequest('No filter criteria specified');
+			/*
+			// search all
+			$folder = $this->userFolder;
+			if (trim($reportTargetNode->getPath(), '/') !== '') {
+				$folder = $folder->get($rootNode->getPath());
+			}
+
+			if (!isset($report->search['pattern']) || trim($report->search['pattern']) === '') {
+				// refuse to return ALL files from the system if no pattern is specified
+				throw new BadRequest('No search criteria specified');
+			}
+
+			// TODO: if depth one, could use a different search algo based on getChildren() ...
+			// TODO: Depth header filtering?
+			$results = $folder->search($report->search['pattern']);
+			$results = $this->slice($results);
+			$results = array_map(function ($result) {
+				return $this->makeSabreNode($result);
+			}, $results);
+			*/
 		} else {
+			if (isset($report->search['pattern'])) {
+				// TODO: implement this at some point...
+				throw new BadRequest('Search pattern cannot be combined with filter');
+			}
+
 			// gather all file ids matching filter
 			try {
 				$resultFileIds = $this->processFilterRules($filterRules);
@@ -366,15 +390,23 @@ class FilesReportPlugin extends ServerPlugin {
 			$entry = $folder->getById($fileId);
 			if ($entry) {
 				$entry = current($entry);
-				if ($entry instanceof \OCP\Files\File) {
-					$results[] = new File($this->fileView, $entry);
-				} else if ($entry instanceof \OCP\Files\Folder) {
-					$results[] = new Directory($this->fileView, $entry);
+				$node = $this->makeSabreNode($entry);
+				if ($node) {
+					$results[] = $node;
 				}
 			}
 		}
 
 		return $results;
+	}
+
+	private function makeSabreNode(\OCP\Files\Node $filesNode) {
+		if ($filesNode instanceof \OCP\Files\File) {
+			return new File($this->fileView, $filesNode);
+		} else if ($filesNode instanceof \OCP\Files\Folder) {
+			return new Directory($this->fileView, $filesNode);
+		}
+		return null;
 	}
 
 	/**
