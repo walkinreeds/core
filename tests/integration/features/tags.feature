@@ -53,7 +53,7 @@ Feature: tags
   Scenario: Renaming a normal tag to an emoji as regular user should work
     Given user "user0" exists
     Given "admin" creates a "normal" tag with name "MySuperAwesomeTagName"
-    When "user0" edits the tag with name "MySuperAwesomeTagName" and sets its name to "😀""
+    When "user0" edits the tag with name "MySuperAwesomeTagName" and sets its name to "😀"
     Then The response should have a status code "207"
     And The following tags should exist for "admin"
       |AnotherTagName|true|true|
