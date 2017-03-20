@@ -601,7 +601,14 @@ class DefaultShareProvider implements IShareProvider {
 
 		// If the recipient is set for a group share resolve to that user
 		if ($recipientId !== null && $share->getShareType() === \OCP\Share::SHARE_TYPE_GROUP) {
-			$share = $this->resolveGroupShare($share, $recipientId);
+			$parentIdToShareMap[$share->getId()] = $share;
+			$resolvedShare = $this->resolveGroupShares($parentIdToShareMap, $recipientId);
+			if (count($resolvedShare) === 1){
+				// If we pass to resolveGroupShares map with one element, we expect to receive exactly one element, otherwise it is error
+				$share = $resolvedShare[0];
+			} else {
+				throw new \Exception("ResolveGroupShares() returned wrong result");
+			}
 		}
 
 		return $share;
@@ -765,17 +772,17 @@ class DefaultShareProvider implements IShareProvider {
 				$cursor->closeCursor();
 			}
 
-			/*
- 			 * Resolve all group shares to user specific shares
- 			 * TODO: Optmize this!
- 			 */
-			foreach($shares2 as $share) {
-				$shares[] = $this->resolveGroupShare($share, $userId);
+			//Resolve all group shares to user specific shares
+			if (!empty($shares2)) {
+				foreach($shares2 as $share) {
+					$parentIdToShareMap[$share->getId()] = $share;
+				}
+				$resolvedGroupShares = $this->resolveGroupShares($parentIdToShareMap, $userId);
+				$shares = array_merge($shares, $resolvedGroupShares);
 			}
 		} else {
 			throw new BackendError('Invalid backend');
 		}
-
 
 		return $shares;
 	}
@@ -860,37 +867,49 @@ class DefaultShareProvider implements IShareProvider {
 	}
 
 	/**
-	 * Resolve a group share to a user specific share
-	 * Thus if the user moved their group share make sure this is properly reflected here.
+	 * Resolve a group shares to a user specific share.
+	 * Returns in the array both the updated share if one was found and for not found in DB passing predicate, the original shares.
+	 * Thus if the user moved their group share make sure this is properly reflected here, and if map passed contain exactly 2 elements, where
+	 * only 1 has been change, it returns also exactly 2 elements, containing the updated one.
 	 *
-	 * @param \OCP\Share\IShare $share
+	 * @param \OCP\Share\IShare[] $parentIdToShareMap parentId => IShare e.g. { 21 => IShare, 23 => IShare }[2]
 	 * @param string $userId
-	 * @return Share Returns the updated share if one was found else return the original share.
+	 * @return \OCP\Share\IShare[] $resolvedShares
 	 */
-	private function resolveGroupShare(\OCP\Share\IShare $share, $userId) {
+	private function resolveGroupShares($parentIdToShareMap, $userId) {
 		$qb = $this->dbConn->getQueryBuilder();
 
-		$stmt = $qb->select('*')
+		$shareParentIds = array_keys($parentIdToShareMap);
+		$qb->select('*')
 			->from('share')
-			->where($qb->expr()->eq('parent', $qb->createNamedParameter($share->getId())))
+			->where($qb->expr()->in('parent', $qb->createNamedParameter(
+				$shareParentIds,
+				IQueryBuilder::PARAM_STR_ARRAY
+			)))
 			->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter(self::SHARE_TYPE_USERGROUP)))
 			->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($userId)))
 			->andWhere($qb->expr()->orX(
 				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
 				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
-			))
-			->setMaxResults(1)
-			->execute();
+			));
 
-		$data = $stmt->fetch();
+		$stmt = $qb->execute();
+
+		// Update $parentIdToShareMap array containing group shares, if any updates for this user
+		while($data = $stmt->fetch()) {
+			$parentId = $data['parent'];
+			// Update only shares contained in the map,
+			// this will ensure that we return the same amount of shares in the input as in the output
+			if (isset($parentIdToShareMap[$parentId])) {
+				$share = $parentIdToShareMap[$parentId];
+				$share->setPermissions(intval($data['permissions']));
+				$share->setTarget($data['file_target']);
+			}
+		}
 		$stmt->closeCursor();
 
-		if ($data !== false) {
-			$share->setPermissions((int)$data['permissions']);
-			$share->setTarget($data['file_target']);
-		}
-
-		return $share;
+		$resolvedShares = array_values($parentIdToShareMap);
+		return $resolvedShares;
 	}
 
 	/**
