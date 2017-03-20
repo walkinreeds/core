@@ -250,7 +250,7 @@ class FilesReportPluginTest extends \Test\TestCase {
 		$this->assertTrue(isset($responses[0][200]));
 		$this->assertTrue(isset($responses[1][200]));
 
-		$this->assertEquals('/test/node1/', $responses[0]['href']);
+		$this->assertEquals('/test/node1', $responses[0]['href']);
 		$this->assertEquals('/test/sub/node2', $responses[1]['href']);
 
 		$props1 = $responses[0];

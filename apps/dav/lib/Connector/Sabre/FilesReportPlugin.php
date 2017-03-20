@@ -362,11 +362,6 @@ class FilesReportPlugin extends ServerPlugin {
 			$result = $propFind->getResultForMultiStatus();
 			$result['href'] = $propFind->getPath();
 
-			$resourceType = $this->server->getResourceTypeForNode($node);
-			if (in_array('{DAV:}collection', $resourceType) || in_array('{DAV:}principal', $resourceType)) {
-				$result['href'] .= '/';
-			}
-
 			$results[] = $result;
 		}
 		return $results;
