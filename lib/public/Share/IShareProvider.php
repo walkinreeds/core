@@ -136,6 +136,18 @@ interface IShareProvider {
 	 */
 	public function getSharesByPath(Node $path);
 
+
+	/**
+	 * Get shared with the given user for shares of all available types for this share provider within all nodes
+	 *
+	 * @param string $userId get shares where this user is the recipient
+	 * @param int[] $shareTypes
+	 * @param Node|null $node
+	 * @return \OCP\Share\IShare[]
+	 * @since 10.0.0
+	 */
+	public function getAllSharedWith($userId, $shareTypes, $node);
+	
 	/**
 	 * Get shared with the given user
 	 *

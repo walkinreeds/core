@@ -780,6 +780,67 @@ class DefaultShareProvider implements IShareProvider {
 		return $shares;
 	}
 
+
+	/**
+	 * @inheritdoc
+	 */
+	public function getAllSharedWith($userId, $shareTypes, $node) {
+		// Create array of sharedWith objects (target user -> $userId or group of which user is a member
+		$user = $this->userManager->get($userId);
+		$allGroups = $this->groupManager->getUserGroups($user, 'sharing');
+
+		$sharedWithUserOrGroup = array_map(function(IGroup $group) { return $group->getGID(); }, $allGroups);
+		$sharedWithUserOrGroup[] = $userId;
+
+		/** @var Share[] $shares */
+		$shares = [];
+
+		//Get shares directly with this user
+		$qb = $this->dbConn->getQueryBuilder();
+		$qb->select('s.*', 'f.fileid', 'f.path')
+			->selectAlias('st.id', 'storage_string_id')
+			->from('share', 's')
+			->leftJoin('s', 'filecache', 'f', $qb->expr()->eq('s.file_source', 'f.fileid'))
+			->leftJoin('f', 'storages', 'st', $qb->expr()->eq('f.storage', 'st.numeric_id'));
+
+		$qb->where($qb->expr()->in(
+			'share_type',
+			$qb->createNamedParameter($shareTypes, IQueryBuilder::PARAM_INT_ARRAY)
+			)
+		);
+
+		$qb->andWhere($qb->expr()->in('share_with', $qb->createNamedParameter(
+			$sharedWithUserOrGroup,
+			IQueryBuilder::PARAM_STR_ARRAY
+		)));
+
+		// Filter by node if provided
+		if ($node !== null) {
+			$qb->andWhere($qb->expr()->eq('file_source', $qb->createNamedParameter($node->getId())));
+		}
+		
+		$qb->andWhere($qb->expr()->orX(
+			$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
+			$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+		));
+
+
+		$cursor = $qb->execute();
+
+		while($data = $cursor->fetch()) {
+			if ($this->isAccessibleResult($data)) {
+				$share = $this->createShare($data);
+				if ($share->getShareType() === \OCP\Share::SHARE_TYPE_GROUP){
+					$shares[] = $this->resolveGroupShare($share, $userId);
+				} else {
+					$shares[] = $share;
+				}
+			}
+		}
+		$cursor->closeCursor();
+		return $shares;
+	}
+
 	/**
 	 * Get a share by token
 	 *

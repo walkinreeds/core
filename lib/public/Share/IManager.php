@@ -112,6 +112,19 @@ interface IManager {
 	 */
 	public function getSharesBy($userId, $shareType, $path = null, $reshares = false, $limit = 50, $offset = 0);
 
+
+	/**
+	 * Get shares shared with $userId for specified share types.
+	 * Filter by $node if provided
+	 * 
+	 * @param string $userId
+	 * @param int[] $shareTypes
+	 * @param Node|null $node
+	 * @return IShare[]
+	 * @since 10.0.0
+	 */
+	public function getAllSharedWith($userId, $shareTypes, $node = null);
+	
 	/**
 	 * Get shares shared with $user.
 	 * Filter by $node if provided
